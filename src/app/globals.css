@@ -1,0 +1,338 @@
+:root {
+  --paper: #ebebe8;
+  --ink: #121211;
+  --ink-2: #51514d;
+  --rule: rgba(18, 18, 17, 0.3);
+  --blend: #ffffff;
+  --font-display: 'Fraunces Variable', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-mono: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e0e0d;
+    --ink: #ecebe6;
+    --ink-2: #a9a8a1;
+    --rule: rgba(236, 235, 230, 0.32);
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  display: block;
+}
+
+.source {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stage[data-gl='off'] .canvas {
+  display: none;
+}
+
+.stage[data-gl='off'] .source {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 1;
+  z-index: -1;
+  filter: grayscale(1) contrast(1.2);
+}
+
+.mark {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  padding: max(14px, 2vh) max(16px, 3vw);
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  color: var(--blend);
+  mix-blend-mode: difference;
+  pointer-events: none;
+}
+
+.mark b {
+  font: 400 1.5rem/1 var(--font-display);
+  font-variation-settings: 'SOFT' 100, 'WONK' 1, 'opsz' 72;
+  letter-spacing: -0.01em;
+}
+
+.mark span {
+  font: 500 0.66rem/1 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.scene {
+  min-height: 100svh;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 max(16px, 5vw) 14vh;
+}
+
+.copy {
+  width: min(34rem, 100%);
+  display: grid;
+  gap: 1.1rem;
+}
+
+.copy h1,
+.copy h2,
+.copy p {
+  margin: 0;
+  color: var(--blend);
+  mix-blend-mode: difference;
+}
+
+.tag {
+  font: 500 0.7rem/1.2 var(--font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.copy h1,
+.copy h2 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-variation-settings: 'SOFT' 100, 'WONK' 1, 'opsz' 144;
+  letter-spacing: -0.015em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.copy h1 {
+  font-size: clamp(2.7rem, 12vw, 5.4rem);
+}
+
+.copy h2 {
+  font-size: clamp(2.1rem, 9vw, 3.9rem);
+}
+
+.copy p:not(.tag) {
+  font: 400 0.92rem/1.6 var(--font-mono);
+  max-width: 34ch;
+}
+
+.hint {
+  font: 500 0.7rem/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cta {
+  justify-self: start;
+  font: 500 0.72rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 0.95rem 1.2rem;
+  cursor: pointer;
+}
+
+.cta:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.cta:focus-visible,
+.dock button:focus-visible,
+.actions button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+@media (max-aspect-ratio: 23/20) {
+  .copy {
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+    padding: 1.1rem 1.1rem 1.25rem;
+    border: 1px solid var(--rule);
+  }
+
+  .copy h1,
+  .copy h2,
+  .copy p {
+    color: var(--ink);
+    mix-blend-mode: normal;
+  }
+}
+
+@media (min-aspect-ratio: 23/20) {
+  .scene {
+    align-items: center;
+    padding-bottom: 0;
+  }
+
+  .copy {
+    width: min(28vw, 32rem);
+    min-width: 16rem;
+  }
+
+  .copy h1 {
+    font-size: clamp(2.7rem, 4.6vw, 5.6rem);
+  }
+
+  .copy h2 {
+    font-size: clamp(2.1rem, 3.5vw, 4rem);
+  }
+}
+
+.dock {
+  position: fixed;
+  left: max(16px, 2.4vw);
+  bottom: max(16px, 3vh);
+  z-index: 8;
+  display: flex;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.dock button {
+  font: 500 0.68rem/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--rule);
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+}
+
+.dock button:last-child {
+  border-right: 0;
+}
+
+.dock button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+@media (max-aspect-ratio: 23/20) {
+  .dock {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-inline: 0;
+    border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .dock button {
+    flex: 1;
+    padding-inline: 0.4rem;
+  }
+}
+
+.panel {
+  position: fixed;
+  left: max(16px, 2.4vw);
+  bottom: calc(max(16px, 3vh) + 3.1rem);
+  z-index: 8;
+  width: min(21rem, calc(100vw - 32px));
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 1rem;
+  display: grid;
+  gap: 0.7rem;
+  max-height: calc(100svh - 7rem);
+  overflow: auto;
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+@media (max-aspect-ratio: 23/20) {
+  .panel {
+    left: 16px;
+    bottom: calc(3.1rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.8rem;
+  font: 500 0.66rem/1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.row output {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.row input {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  font: 500 0.66rem/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: none;
+  border: 1px solid var(--ink);
+  padding: 0.7rem 0.8rem;
+  cursor: pointer;
+}
+
+.actions button:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
