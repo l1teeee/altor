@@ -1,23 +1,10 @@
-# Cosmos Carboncillo
+# memoria
 
-Página en estilo carboncillo: un shader WebGL2 en vivo sobre un clip corto de video.
+Una experiencia de recuerdos, luz y papel en siete escenas al desplazar la página.
 
-## Uso
+Instala las dependencias con `npm install`.
+Inicia el entorno local con `npm run dev` y abre http://localhost:3000.
+Compila con `npm run build`; sirve la compilación con `npm start`.
 
-```
-npm install
-npm run dev
-```
-
-## Estructura
-
-- `src/lib/shader.ts`: shaders GLSL (tono, papel, marco, pulso)
-- `src/lib/renderer.ts`: renderer WebGL2 con calidad adaptativa
-- `src/lib/params.ts`: parámetros por defecto y keyframes de scroll
-- `src/components/Experience.tsx`: UI, panel de ajustes y bucle de render
-- `public/cosmos.webm`, `public/cosmos.mp4`: clip fuente (80x60 y 96x72, ~20 KB en total)
-
-## Usar tu propio video
-
-Botón "Mi video" en la página para probarlo, o reemplaza los archivos de `public/`.
-Cualquier clip funciona; para el peso más bajo conviene reducirlo a unos 96x72 y desenfocarlo antes.
+Los keyframes de cada escena y de ambos formatos viven en `src/lib/params.ts`.
+La geometría compartida de las tres imágenes vive en `src/lib/plate-layout.ts`.

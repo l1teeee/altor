@@ -1,13 +1,13 @@
 import { FRAGMENT_SHADER, VERTEX_SHADER } from './shader';
 import { keyframe, type Params } from './params';
+import { plateLayout } from './plate-layout';
 
-export type SourceMode = 'video' | 'humo';
 export type RGB = [number, number, number];
 
 export interface RenderState {
   params: Params;
   scene: number;
-  mode: SourceMode;
+  forceSmoke: boolean;
   paper: RGB;
   ink: RGB;
   dark: number;
@@ -28,8 +28,14 @@ const UNIFORM_NAMES = [
   'uRes',
   'uTime',
   'uVideo',
-  'uMode',
-  'uPlate',
+  'uVideoPrev',
+  'uWash',
+  'uEcho',
+  'uSmoke',
+  'uFragments',
+  'uPlateAlpha',
+  'uFields',
+  'uPlates',
   'uK',
   'uSmudge',
   'uBloom',
@@ -49,17 +55,22 @@ const UNIFORM_NAMES = [
 type UniformName = (typeof UNIFORM_NAMES)[number];
 
 const TRAIL_LENGTH = 10;
+const INTRO_MS = 2600;
+const FIELD_KEYFRAMES = ['dust', 'window', 'rain', 'tree', 'sea', 'smokeField'] as const;
 
 export class CharcoalRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly texture: WebGLTexture;
+  private readonly previousTexture: WebGLTexture;
   private readonly vao: WebGLVertexArrayObject;
   private readonly uniforms = {} as Record<UniformName, WebGLUniformLocation | null>;
   private readonly trail: TrailPoint[] = Array.from({ length: TRAIL_LENGTH }, () => ({ x: -9999, y: -9999, w: 0 }));
   private readonly trailData = new Float32Array(TRAIL_LENGTH * 3);
   private readonly pointer = { x: 0, y: 0, sx: 0, sy: 0, t: -1e9, has: false };
   private readonly plate = { cx: 0, cy: 0, hw: 0, hh: 0 };
+  private readonly plateData = new Float32Array(12);
+  private readonly fieldData = new Float32Array(FIELD_KEYFRAMES.length);
   private quality = 1;
   private width = 0;
   private height = 0;
@@ -70,6 +81,7 @@ export class CharcoalRenderer {
   private ema = 16;
   private lastFrame = 0;
   private startTime = 0;
+  private lastEchoUpload = -Infinity;
 
   private constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -85,8 +97,10 @@ export class CharcoalRenderer {
     UNIFORM_NAMES.forEach((name) => {
       this.uniforms[name] = gl.getUniformLocation(this.program, name);
     });
-    this.texture = this.createTexture();
+    this.texture = this.createTexture(0);
+    this.previousTexture = this.createTexture(1);
     gl.uniform1i(this.uniforms.uVideo, 0);
+    gl.uniform1i(this.uniforms.uVideoPrev, 1);
     this.resize();
   }
 
@@ -126,10 +140,10 @@ export class CharcoalRenderer {
     return program;
   }
 
-  private createTexture(): WebGLTexture {
+  private createTexture(unit: number): WebGLTexture {
     const { gl } = this;
     const texture = gl.createTexture()!;
-    gl.activeTexture(gl.TEXTURE0);
+    gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -148,27 +162,38 @@ export class CharcoalRenderer {
     const { width: W, height: H, dpr } = this;
     this.canvas.width = Math.max(2, Math.round(W * dpr));
     this.canvas.height = Math.max(2, Math.round(H * dpr));
-    const wide = W / H >= 1.15;
-    let pw: number;
-    let ph: number;
-    let cx: number;
-    let cy: number;
-    if (wide) {
-      pw = Math.min(W * 0.62, H * 0.86 * (4 / 3));
-      ph = pw * 0.75;
-      cx = W - pw / 2 - W * 0.035;
-      cy = H / 2;
-    } else {
-      pw = W * 0.92;
-      ph = pw * 0.75;
-      cx = W / 2;
-      cy = 56 + ph / 2;
+  }
+
+  private updatePlates(scene: number): void {
+    const { width, height, dpr } = this;
+    const plates = plateLayout(scene, width, height, this.options.reducedMotion);
+    plates.forEach((plate, i) => {
+      this.plateData[i * 4] = plate.x * dpr;
+      this.plateData[i * 4 + 1] = (height - plate.y) * dpr;
+      this.plateData[i * 4 + 2] = plate.width * dpr / 2;
+      this.plateData[i * 4 + 3] = plate.height * dpr / 2;
+    });
+    this.plate.cx = this.plateData[0];
+    this.plate.cy = this.plateData[1];
+    this.plate.hw = this.plateData[2];
+    this.plate.hh = this.plateData[3];
+    this.scale = plates[0].height * dpr / 720;
+  }
+
+  private uploadVideo(now: number): void {
+    const { gl, video } = this;
+    if (video.readyState < 2 || video.videoWidth === 0) return;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    if (now - this.lastEchoUpload >= 350) {
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, this.previousTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      this.lastEchoUpload = now;
     }
-    this.plate.cx = cx * dpr;
-    this.plate.cy = (H - cy) * dpr;
-    this.plate.hw = (pw / 2) * dpr;
-    this.plate.hh = (ph / 2) * dpr;
-    this.scale = (ph * dpr) / 720;
   }
 
   setPointer(x: number, y: number, now: number): void {
@@ -183,7 +208,7 @@ export class CharcoalRenderer {
     }
   }
 
-  private stepTrail(now: number): void {
+  private stepTrail(now: number, scene: number): void {
     const { pointer: p, trail, plate, dpr, height } = this;
     const active = p.has && now - p.t < 2200;
     let x: number;
@@ -197,8 +222,13 @@ export class CharcoalRenderer {
       w = 1;
     } else if (!this.options.reducedMotion) {
       const t = now / 1000;
-      x = plate.cx + Math.cos(t * 0.4) * plate.hw * 0.45;
-      y = plate.cy + Math.sin(t * 0.55) * plate.hh * 0.35;
+      if (keyframe('plateAlpha', scene) < 0.5) {
+        x = (this.width / 2) * dpr + Math.cos(t * 0.4) * this.width * dpr * 0.25;
+        y = (height / 2) * dpr + Math.sin(t * 0.55) * height * dpr * 0.25;
+      } else {
+        x = plate.cx + Math.cos(t * 0.4) * plate.hw * 0.45;
+        y = plate.cy + Math.sin(t * 0.55) * plate.hh * 0.35;
+      }
       w = 0.4;
     } else {
       x = -9999;
@@ -223,8 +253,14 @@ export class CharcoalRenderer {
     }
   }
 
+  private introProgress(now: number): number {
+    if (this.options.reducedMotion) return 1;
+    const linear = Math.min(1, (now - this.startTime) / INTRO_MS);
+    return linear * linear * (3 - 2 * linear);
+  }
+
   render(now: number, state: RenderState): void {
-    const { gl, uniforms: u, video } = this;
+    const { gl, uniforms: u } = this;
     if (this.startTime === 0) {
       this.startTime = now;
       this.lastFrame = now;
@@ -237,26 +273,32 @@ export class CharcoalRenderer {
       this.quality = Math.max(0.55, this.quality * 0.82);
       this.resize();
     }
-    if (video.readyState >= 2 && video.videoWidth > 0) {
-      gl.bindTexture(gl.TEXTURE_2D, this.texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-      gl.generateMipmap(gl.TEXTURE_2D);
-    }
-    this.stepTrail(now);
+    this.uploadVideo(now);
+    this.updatePlates(state.scene);
+    this.stepTrail(now, state.scene);
 
     const { params: P, scene } = state;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.uniform2f(u.uRes, this.canvas.width, this.canvas.height);
-    gl.uniform1f(u.uTime, (now - this.startTime) / 1000);
-    gl.uniform1i(u.uMode, state.mode === 'humo' ? 1 : 0);
-    gl.uniform4f(u.uPlate, this.plate.cx, this.plate.cy, this.plate.hw, this.plate.hh);
+    gl.uniform1f(u.uTime, this.options.reducedMotion ? 0 : (now - this.startTime) / 1000);
+    const intro = this.introProgress(now);
+    gl.uniform1f(u.uWash, 1 + (keyframe('wash', scene) - 1) * intro);
+    gl.uniform1f(u.uEcho, keyframe('echo', scene));
+    gl.uniform1f(u.uSmoke, state.forceSmoke ? 1 : 0);
+    gl.uniform1f(u.uFragments, keyframe('fragments', scene));
+    gl.uniform1f(u.uPlateAlpha, keyframe('plateAlpha', scene));
+    FIELD_KEYFRAMES.forEach((name, i) => {
+      this.fieldData[i] = keyframe(name, scene);
+    });
+    gl.uniform1fv(u.uFields, this.fieldData);
+    gl.uniform4fv(u.uPlates, this.plateData);
     gl.uniform1f(u.uK, this.scale);
     gl.uniform1f(u.uSmudge, P.smudge * keyframe('smudge', scene));
     gl.uniform1f(u.uBloom, P.bloom * keyframe('bloom', scene));
     gl.uniform1f(u.uContrast, P.contrast);
     gl.uniform1f(u.uTooth, Math.min(1, P.tooth * keyframe('tooth', scene)));
     gl.uniform1f(u.uToothScale, P.grain * keyframe('grain', scene));
-    gl.uniform1f(u.uBoil, P.boil * keyframe('boil', scene));
+    gl.uniform1f(u.uBoil, this.options.reducedMotion ? 0 : P.boil * keyframe('boil', scene));
     gl.uniform1f(u.uFrame, P.frame);
     gl.uniform1f(u.uFrameW, keyframe('frameW', scene));
     gl.uniform1f(u.uDark, state.dark);
@@ -270,6 +312,7 @@ export class CharcoalRenderer {
   dispose(): void {
     const { gl } = this;
     gl.deleteTexture(this.texture);
+    gl.deleteTexture(this.previousTexture);
     gl.deleteProgram(this.program);
     gl.deleteVertexArray(this.vao);
   }

@@ -2,13 +2,11 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import '@fontsource-variable/fraunces/full.css';
 import '@fontsource/dm-mono/400.css';
-import '@fontsource/dm-mono/500.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Cosmos Carboncillo',
-  description:
-    'Demo de una página en estilo carboncillo: un shader WebGL en vivo sobre un clip corto de video, con controles de grano, difuminado y marco.',
+  title: 'memoria',
+  description: 'recuerdos que se desvanecen en la luz.',
 };
 
 export const viewport: Viewport = {
