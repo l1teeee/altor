@@ -70,6 +70,10 @@ body {
   filter: grayscale(1) contrast(1.2);
 }
 
+.stage[data-gl='off'] .source-tree {
+  opacity: calc((1 - var(--wash)) * var(--tree-video, 0));
+}
+
 .veil {
   position: fixed;
   inset: 0;
@@ -249,15 +253,6 @@ body {
 .corner-tr { top: var(--inset-y); right: var(--inset-x); }
 .corner-bl { bottom: var(--inset-y); left: var(--inset-x); }
 .corner-br { bottom: var(--inset-y); right: var(--inset-x); }
-
-.timecode {
-  position: absolute;
-  top: var(--inset-y);
-  right: calc(var(--inset-x) + 28px);
-  font: 400 0.7rem/1 var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
-}
 
 .connections {
   --p: var(--p-4, 0);

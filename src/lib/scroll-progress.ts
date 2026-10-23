@@ -1,7 +1,7 @@
 import { keyframe } from './params';
 import { plateLayout } from './plate-layout';
 
-export function publishScroll(sections: HTMLElement[], counter: HTMLElement | null, reducedMotion: boolean) {
+export function publishScroll(sections: HTMLElement[], reducedMotion: boolean) {
   const root = document.documentElement;
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -23,6 +23,7 @@ export function publishScroll(sections: HTMLElement[], counter: HTMLElement | nu
   root.style.setProperty('--scene', String(scene));
   root.style.setProperty('--scroll-progress', String(scene / (sections.length - 1)));
   root.style.setProperty('--wash', String(keyframe('wash', scene)));
+  root.style.setProperty('--tree-video', String(keyframe('treeVideo', scene)));
 
   const plates = plateLayout(scene, width, height, reducedMotion);
   root.style.setProperty('--plate-x', `${plates[0].x}px`);
@@ -34,9 +35,5 @@ export function publishScroll(sections: HTMLElement[], counter: HTMLElement | nu
     root.style.setProperty(`--link-${i}-angle`, `${Math.atan2(dy, dx)}rad`);
   }
 
-  if (counter) {
-    const seconds = Math.round(Math.max(0, Math.min(1, scene - 1)) * 59);
-    counter.textContent = `00:${String(seconds).padStart(2, '0')}`;
-  }
   return scene;
 }

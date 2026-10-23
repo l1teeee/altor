@@ -26,8 +26,8 @@ type SceneValues = readonly [
 ];
 type LayoutKey = 'plateScale' | 'plateX' | 'plateY';
 export type KeyframeName = LayoutKey | 'smudge' | 'bloom' | 'grain' | 'tooth' | 'boil'
-  | 'frameW' | 'wash' | 'echo' | 'fragments' | 'plateAlpha'
-  | 'dust' | 'window' | 'rain' | 'tree' | 'sea' | 'smokeField';
+  | 'frameW' | 'wash' | 'echo' | 'fragments' | 'plateAlpha' | 'treeVideo'
+  | 'dust' | 'window' | 'rain' | 'sea' | 'smokeField';
 
 // Columns follow umbral, llegada, eco, lluvia, fragmentos, arbol, desvanecer, mar, humo, regreso.
 export const KEYFRAMES: Record<KeyframeName, SceneValues> = {
@@ -39,12 +39,12 @@ export const KEYFRAMES: Record<KeyframeName, SceneValues> = {
   frameW:     [0.4, 0.7, 0.55, 0.55, 0.6, 0.55, 0.2, 0.5, 0.4, 0.4],
   wash:       [0.3, 0.12, 0.18, 0.15, 0.1, 0.15, 0.7, 0.2, 0.2, 0.45],
   echo:       [0, 0, 0.48, 0, 0.16, 0, 0.1, 0, 0, 0],
-  fragments:  [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-  plateAlpha: [0, 1, 1, 0, 1, 0, 1, 0, 0, 0],
+  fragments:  [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+  plateAlpha: [0, 1, 1, 0, 1, 1, 1, 0, 0, 0],
+  treeVideo:  [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
   dust:       [1, 0.35, 0, 0, 0.3, 0, 0, 0, 0, 1],
   window:     [0, 0.6, 0.5, 0, 0, 0, 0, 0, 0, 0],
   rain:       [0, 0, 0.45, 1, 0, 0, 0, 0, 0, 0],
-  tree:       [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
   sea:        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
   smokeField: [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
   plateScale: [0.44, 0.44, 0.54, 0.5, 0.42, 0.6, 1.08, 0.6, 0.5, 0.44],
@@ -53,7 +53,7 @@ export const KEYFRAMES: Record<KeyframeName, SceneValues> = {
 };
 
 const PORTRAIT_KEYFRAMES: Record<LayoutKey, SceneValues> = {
-  plateScale: [0.25, 0.25, 0.29, 0.27, 0.2, 0.4, 1.08, 0.4, 0.3, 0.25],
+  plateScale: [0.25, 0.25, 0.29, 0.27, 0.2, 0.24, 1.08, 0.4, 0.3, 0.25],
   plateX:     [0.5, 0.5, 0.5, 0.5, 0.51, 0.5, 0.5, 0.5, 0.5, 0.5],
   plateY:     [0.5, 0.5, 0.46, 0.5, 0.47, 0.5, 0.5, 0.5, 0.5, 0.5],
 };

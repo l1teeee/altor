@@ -13,12 +13,14 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform sampler2D uVideo;
 uniform sampler2D uVideoPrev;
+uniform sampler2D uTreeVideo;
+uniform float uTreeMix;
 uniform float uWash;
 uniform float uEcho;
 uniform float uSmoke;
 uniform float uFragments;
 uniform float uPlateAlpha;
-uniform float uFields[6];
+uniform float uFields[5];
 uniform vec4 uPlates[3];
 uniform float uK;
 uniform float uSmudge;
@@ -38,6 +40,12 @@ out vec4 outColor;
 `;
 
 const PLATE_GLSL = `
+// Crossfades cosmos into the tree clip, skipping the texture that is fully hidden.
+float sourceLum(vec2 uv, float lod){
+  float cosmos = uTreeMix < .999 ? lum(textureLod(uVideo, uv, lod).rgb) : 0.;
+  float tree = uTreeMix > .001 ? lum(textureLod(uTreeVideo, uv, lod).rgb) : 0.;
+  return mix(cosmos, tree, uTreeMix);
+}
 float blurLum(vec2 uv, vec2 rad, float rot, float lod){
   float acc = 0.;
   for (int i = 0; i < 12; i++){
@@ -45,7 +53,7 @@ float blurLum(vec2 uv, vec2 rad, float rot, float lod){
     float r = sqrt(fi / 12.);
     float a = fi * 2.39996323 + rot;
     vec2 sampleUV = uv + vec2(cos(a), sin(a)) * r * rad;
-    float current = lum(textureLod(uVideo, sampleUV, lod).rgb);
+    float current = sourceLum(sampleUV, lod);
     if (uEcho > .001){
       float previous = lum(textureLod(uVideoPrev, sampleUV + vec2(.015, -.012), lod).rgb);
       current = mix(current, previous, uEcho);
@@ -60,7 +68,7 @@ float bloomLum(vec2 uv, vec2 rad, float rot, float lod){
     float fi = float(i) + .5;
     float r = sqrt(fi / 10.);
     float a = fi * 2.39996323 + rot;
-    acc += max(lum(textureLod(uVideo, uv + vec2(cos(a), sin(a)) * r * rad, lod).rgb) - .62, 0.);
+    acc += max(sourceLum(uv + vec2(cos(a), sin(a)) * r * rad, lod) - .62, 0.);
   }
   return acc / 10. * 1.4;
 }
@@ -119,15 +127,9 @@ float placePlate(float ink, vec2 plateTerms, float inside, float weight){
 `;
 
 const MAIN_GLSL = `
-// Narrow screens shrink the tree around its ground point so the canopy stays in frame.
-vec2 fitTreeToViewport(vec2 uv){
-  float fit = clamp((uRes.x / uRes.y) / 1.1, .45, 1.);
-  return vec2(uv.x / fit, (uv.y + .5) / fit - .5);
-}
-
 float backgroundInk(vec2 screenUV){
   float total = 0.;
-  for (int i = 0; i < 6; i++) total += uFields[i];
+  for (int i = 0; i < 5; i++) total += uFields[i];
   if (total < .001) return 0.;
 
   // Memories drift: the whole field wanders slowly.
@@ -138,9 +140,8 @@ float backgroundInk(vec2 screenUV){
   if (uFields[0] > .001) bg += uFields[0] * dustInk(uv, uTime);
   if (uFields[1] > .001) bg += uFields[1] * windowInk(uv, uTime);
   if (uFields[2] > .001) bg += uFields[2] * rainInk(uv, uTime);
-  if (uFields[3] > .001) bg += uFields[3] * treeInk(fitTreeToViewport(uv), uTime);
-  if (uFields[4] > .001) bg += uFields[4] * seaInk(uv, uTime);
-  if (uFields[5] > .001) bg += uFields[5] * smokeInk(uv);
+  if (uFields[3] > .001) bg += uFields[3] * seaInk(uv, uTime);
+  if (uFields[4] > .001) bg += uFields[4] * smokeInk(uv);
   return clamp(bg, 0., 1.);
 }
 

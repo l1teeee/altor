@@ -19,7 +19,7 @@ const MAX_VEIL_MS = 4000;
 export function Experience({ children }: { children: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const counterRef = useRef<HTMLSpanElement>(null);
+  const treeVideoRef = useRef<HTMLVideoElement>(null);
   const sceneRef = useRef(0);
   const [glOn, setGlOn] = useState(true);
   const [veilLifted, setVeilLifted] = useState(false);
@@ -27,7 +27,9 @@ export function Experience({ children }: { children: ReactNode }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    if (!canvas || !video) return;
+    const treeVideo = treeVideoRef.current;
+    if (!canvas || !video || !treeVideo) return;
+    const clips = [video, treeVideo];
 
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const options = {
@@ -38,21 +40,27 @@ export function Experience({ children }: { children: ReactNode }) {
     let active = true;
     const play = () => {
       if (options.reducedMotion) return;
-      // Autoplay can be denied until the first pointer interaction.
-      void video.play().catch(() => {
-        if (active) window.addEventListener('pointerdown', play, { once: true });
+      clips.forEach((clip) => {
+        // Autoplay can be denied until the first pointer interaction.
+        void clip.play().catch(() => {
+          if (active) window.addEventListener('pointerdown', play, { once: true });
+        });
       });
     };
-    const onLoaded = () => {
-      forceSmoke = false;
+    const onLoaded = (event: Event) => {
+      const clip = event.currentTarget as HTMLVideoElement;
+      if (clip === video) forceSmoke = false;
       if (options.reducedMotion) {
-        video.currentTime = 1.2;
-        video.pause();
+        clip.currentTime = 1.2;
+        clip.pause();
       }
     };
-    video.addEventListener('loadeddata', onLoaded);
-    video.muted = true;
+    clips.forEach((clip) => {
+      clip.addEventListener('loadeddata', onLoaded);
+      clip.muted = true;
+    });
     video.src = video.canPlayType('video/webm; codecs="vp9"') ? '/cosmos.webm' : '/cosmos.mp4';
+    treeVideo.src = treeVideo.canPlayType('video/webm; codecs="vp9"') ? '/arbol.webm' : '/arbol.mp4';
     play();
     const stall = window.setTimeout(() => {
       forceSmoke = video.readyState < 2 || video.videoWidth === 0;
@@ -76,7 +84,7 @@ export function Experience({ children }: { children: ReactNode }) {
       });
     });
 
-    const renderer = CharcoalRenderer.create(canvas, video, options);
+    const renderer = CharcoalRenderer.create(canvas, video, treeVideo, options);
     setGlOn(renderer !== null);
     const theme = { paper: [0.949, 0.925, 0.882] as RGB, ink: [0.118, 0.102, 0.082] as RGB, dark: 0 };
     const readTheme = () => {
@@ -91,7 +99,7 @@ export function Experience({ children }: { children: ReactNode }) {
     let scrollRaf = 0;
     const readScroll = () => {
       scrollRaf = 0;
-      sceneRef.current = publishScroll(sections, counterRef.current, options.reducedMotion);
+      sceneRef.current = publishScroll(sections, options.reducedMotion);
     };
     const onScroll = () => {
       if (!scrollRaf) scrollRaf = requestAnimationFrame(readScroll);
@@ -102,7 +110,7 @@ export function Experience({ children }: { children: ReactNode }) {
     };
     const onMotion = () => {
       options.reducedMotion = motion.matches;
-      if (motion.matches) video.pause();
+      if (motion.matches) clips.forEach((clip) => clip.pause());
       else play();
       onScroll();
     };
@@ -132,8 +140,10 @@ export function Experience({ children }: { children: ReactNode }) {
       cancelAnimationFrame(scrollRaf);
       cancelAnimationFrame(liftRaf);
       window.clearTimeout(stall);
-      video.pause();
-      video.removeEventListener('loadeddata', onLoaded);
+      clips.forEach((clip) => {
+        clip.pause();
+        clip.removeEventListener('loadeddata', onLoaded);
+      });
       window.removeEventListener('pointerdown', play);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
@@ -150,8 +160,9 @@ export function Experience({ children }: { children: ReactNode }) {
       </div>
       <canvas ref={canvasRef} className="canvas" aria-hidden="true" />
       <video ref={videoRef} className="source" muted loop playsInline preload="auto" aria-hidden="true" />
+      <video ref={treeVideoRef} className="source source-tree" muted loop playsInline preload="auto" aria-hidden="true" />
       <main>{children}</main>
-      <Overlay counterRef={counterRef} />
+      <Overlay />
     </div>
   );
 }

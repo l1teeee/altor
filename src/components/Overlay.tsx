@@ -1,6 +1,4 @@
-import type { RefObject } from 'react';
-
-export function Overlay({ counterRef }: { counterRef: RefObject<HTMLSpanElement | null> }) {
+export function Overlay() {
   return (
     <div className="overlay" aria-hidden="true">
       <svg className="mark-defs" width="0" height="0" focusable="false">
@@ -40,7 +38,6 @@ export function Overlay({ counterRef }: { counterRef: RefObject<HTMLSpanElement 
         <svg className="corner corner-br" viewBox="0 0 16 16">
           <path d="M14.6 1.5 Q15.2 8 15 15 Q8 14.5 1.5 15.2" />
         </svg>
-        <span className="timecode" ref={counterRef}>00:00</span>
       </div>
       <div className="connections">
         <i className="connection connection-one" />

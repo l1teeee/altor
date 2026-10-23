@@ -29,6 +29,8 @@ const UNIFORM_NAMES = [
   'uTime',
   'uVideo',
   'uVideoPrev',
+  'uTreeVideo',
+  'uTreeMix',
   'uWash',
   'uEcho',
   'uSmoke',
@@ -56,13 +58,18 @@ type UniformName = (typeof UNIFORM_NAMES)[number];
 
 const TRAIL_LENGTH = 10;
 const INTRO_MS = 2600;
-const FIELD_KEYFRAMES = ['dust', 'window', 'rain', 'tree', 'sea', 'smokeField'] as const;
+const FIELD_KEYFRAMES = ['dust', 'window', 'rain', 'sea', 'smokeField'] as const;
+
+function isPlayable(video: HTMLVideoElement): boolean {
+  return video.readyState >= 2 && video.videoWidth > 0;
+}
 
 export class CharcoalRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly texture: WebGLTexture;
   private readonly previousTexture: WebGLTexture;
+  private readonly treeTexture: WebGLTexture;
   private readonly vao: WebGLVertexArrayObject;
   private readonly uniforms = {} as Record<UniformName, WebGLUniformLocation | null>;
   private readonly trail: TrailPoint[] = Array.from({ length: TRAIL_LENGTH }, () => ({ x: -9999, y: -9999, w: 0 }));
@@ -86,6 +93,7 @@ export class CharcoalRenderer {
   private constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly video: HTMLVideoElement,
+    private readonly treeVideo: HTMLVideoElement,
     private readonly options: RendererOptions,
     gl: WebGL2RenderingContext,
   ) {
@@ -99,14 +107,17 @@ export class CharcoalRenderer {
     });
     this.texture = this.createTexture(0);
     this.previousTexture = this.createTexture(1);
+    this.treeTexture = this.createTexture(2);
     gl.uniform1i(this.uniforms.uVideo, 0);
     gl.uniform1i(this.uniforms.uVideoPrev, 1);
+    gl.uniform1i(this.uniforms.uTreeVideo, 2);
     this.resize();
   }
 
   static create(
     canvas: HTMLCanvasElement,
     video: HTMLVideoElement,
+    treeVideo: HTMLVideoElement,
     options: RendererOptions,
   ): CharcoalRenderer | null {
     const gl = canvas.getContext('webgl2', {
@@ -115,7 +126,7 @@ export class CharcoalRenderer {
       powerPreference: 'high-performance',
     });
     if (!gl) return null;
-    return new CharcoalRenderer(canvas, video, options, gl);
+    return new CharcoalRenderer(canvas, video, treeVideo, options, gl);
   }
 
   private compile(type: number, source: string): WebGLShader {
@@ -180,19 +191,24 @@ export class CharcoalRenderer {
     this.scale = plates[0].height * dpr / 720;
   }
 
-  private uploadVideo(now: number): void {
-    const { gl, video } = this;
-    if (video.readyState < 2 || video.videoWidth === 0) return;
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+  private uploadFrame(unit: number, texture: WebGLTexture, video: HTMLVideoElement): void {
+    const { gl } = this;
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
     gl.generateMipmap(gl.TEXTURE_2D);
-    if (now - this.lastEchoUpload >= 350) {
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, this.previousTexture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-      gl.generateMipmap(gl.TEXTURE_2D);
-      this.lastEchoUpload = now;
+  }
+
+  private uploadVideos(now: number, treeMix: number): void {
+    if (treeMix < 1 && isPlayable(this.video)) {
+      this.uploadFrame(0, this.texture, this.video);
+      if (now - this.lastEchoUpload >= 350) {
+        this.uploadFrame(1, this.previousTexture, this.video);
+        this.lastEchoUpload = now;
+      }
+    }
+    if (treeMix > 0) {
+      this.uploadFrame(2, this.treeTexture, this.treeVideo);
     }
   }
 
@@ -273,17 +289,19 @@ export class CharcoalRenderer {
       this.quality = Math.max(0.55, this.quality * 0.82);
       this.resize();
     }
-    this.uploadVideo(now);
-    this.updatePlates(state.scene);
-    this.stepTrail(now, state.scene);
-
     const { params: P, scene } = state;
+    const treeMix = isPlayable(this.treeVideo) ? keyframe('treeVideo', scene) : 0;
+    this.uploadVideos(now, treeMix);
+    this.updatePlates(scene);
+    this.stepTrail(now, scene);
+
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.uniform2f(u.uRes, this.canvas.width, this.canvas.height);
     gl.uniform1f(u.uTime, this.options.reducedMotion ? 0 : (now - this.startTime) / 1000);
     const intro = this.introProgress(now);
     gl.uniform1f(u.uWash, 1 + (keyframe('wash', scene) - 1) * intro);
     gl.uniform1f(u.uEcho, keyframe('echo', scene));
+    gl.uniform1f(u.uTreeMix, treeMix);
     gl.uniform1f(u.uSmoke, state.forceSmoke ? 1 : 0);
     gl.uniform1f(u.uFragments, keyframe('fragments', scene));
     gl.uniform1f(u.uPlateAlpha, keyframe('plateAlpha', scene));
@@ -313,6 +331,7 @@ export class CharcoalRenderer {
     const { gl } = this;
     gl.deleteTexture(this.texture);
     gl.deleteTexture(this.previousTexture);
+    gl.deleteTexture(this.treeTexture);
     gl.deleteProgram(this.program);
     gl.deleteVertexArray(this.vao);
   }

@@ -116,67 +116,6 @@ float rainInk(vec2 uv, float t){
   return clamp(ink, 0., 1.);
 }
 
-float capsuleDist(vec2 p, vec2 a, vec2 b, float r){
-  vec2 pa = p - a;
-  vec2 ba = b - a;
-  float h = clamp(dot(pa, ba) / dot(ba, ba), 0., 1.);
-  return length(pa - ba * h) - r;
-}
-
-float fallingLeaves(vec2 uv, float t){
-  float mask = 0.;
-  for (int i = 0; i < 7; i++){
-    float fi = float(i);
-    float speed = .035 + .035 * hash11(fi * 9.1 + 1.);
-    float progress = fract(t * speed + hash11(fi * 2.7 + 1.));
-    float x = (hash11(fi * 5.3 + 1.) - .5) * .7 + sin(t * .7 + fi * 3.) * .05 + progress * .18;
-    vec2 d = uv - vec2(x, .2 - progress * .65);
-    float spin = t * (.8 + hash11(fi * 1.3 + 1.)) + fi * 2.;
-    vec2 q = vec2(cos(spin) * d.x - sin(spin) * d.y, sin(spin) * d.x + cos(spin) * d.y);
-    float fade = smoothstep(0., .1, progress) * (1. - smoothstep(.85, 1., progress));
-    mask = max(mask, (1. - smoothstep(.012, .024, length(q * vec2(1., 2.8)))) * fade);
-  }
-  return mask;
-}
-
-float treeInk(vec2 uv, float t){
-  float ink = mix(.2, .08, smoothstep(-.5, .4, uv.y));
-  ink = mix(ink, .32, 1. - smoothstep(-.43, -.38, uv.y));
-
-  float branchDist = 1.;
-  float tipGlow = 0.;
-  if (abs(uv.x) < .6 && uv.y < .4){
-    float angle[32];
-    vec2 tip[32];
-    angle[0] = 0.;
-    tip[0] = vec2(0., -.44);
-    for (int k = 1; k < 32; k++){
-      int parent = k / 2;
-      int depth = k < 2 ? 0 : k < 4 ? 1 : k < 8 ? 2 : k < 16 ? 3 : 4;
-      float fk = float(k);
-      float fd = float(depth);
-      float side = (k % 2 == 0) ? -1. : 1.;
-      float spread = (.3 + .3 * hash11(fk * 1.7 + 3.)) * side + (hash11(fk * 2.3 + 1.) - .5) * .25;
-      if (k == 1) spread = 0.;
-      float a = angle[parent] + spread + sin(t * .6 + fd) * .03 * fd;
-      float len = .19 * pow(.76, fd) * (.8 + .4 * hash11(fk * 4.1 + 1.));
-      vec2 start = tip[parent];
-      vec2 end = start + vec2(sin(a), cos(a)) * len;
-      branchDist = min(branchDist, capsuleDist(uv, start, end, .013 * pow(.6, fd)));
-      angle[k] = a;
-      tip[k] = end;
-      if (depth == 4) tipGlow += 1. - smoothstep(0., .17, length(uv - end));
-    }
-  }
-
-  float branch = 1. - smoothstep(0., .006, branchDist);
-  float leafy = tipGlow * (.35 + 1.1 * fbm(uv * 11. + vec2(t * .08, -t * .05)));
-  float canopy = smoothstep(.3, .8, leafy);
-  ink = mix(ink, .8, branch);
-  ink = mix(ink, .66, canopy * .9);
-  return mix(ink, .78, fallingLeaves(uv, t));
-}
-
 float seaInk(vec2 uv, float t){
   float horizon = .06;
   float aboveHorizon = uv.y - horizon;
