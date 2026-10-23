@@ -70,6 +70,39 @@ body {
   filter: grayscale(1) contrast(1.2);
 }
 
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--paper);
+  pointer-events: none;
+  transition: opacity 0.9s ease, visibility 0s 0.9s;
+  /* Failsafe so the page is never stuck behind the veil if scripts fail. */
+  animation: veil-failsafe 0.9s ease 8s forwards;
+}
+
+.veil[data-lifted='true'] {
+  opacity: 0;
+  visibility: hidden;
+  animation: none;
+}
+
+.veil-pulse {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 9%, var(--paper));
+  animation: veil-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes veil-breathe {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 1; }
+}
+
+@keyframes veil-failsafe {
+  to { opacity: 0; visibility: hidden; }
+}
+
 .scene {
   --p: 0.5;
   min-height: 100svh;
@@ -364,6 +397,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .veil-pulse {
+    animation: none;
+    opacity: 0.5;
+  }
+
   .copy,
   .strata {
     transform: none;

@@ -13,12 +13,16 @@ function parseHex(value: string): RGB | null {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
+const MIN_VEIL_MS = 600;
+const MAX_VEIL_MS = 4000;
+
 export function Experience({ children }: { children: ReactNode }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const counterRef = useRef<HTMLSpanElement>(null);
   const sceneRef = useRef(0);
   const [glOn, setGlOn] = useState(true);
+  const [veilLifted, setVeilLifted] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,6 +57,24 @@ export function Experience({ children }: { children: ReactNode }) {
     const stall = window.setTimeout(() => {
       forceSmoke = video.readyState < 2 || video.videoWidth === 0;
     }, 4000);
+
+    // Keep the veil up until the first video frame and the fonts are in, but never longer than MAX_VEIL_MS.
+    const videoReady = new Promise<void>((resolve) => {
+      video.addEventListener('loadeddata', () => resolve(), { once: true });
+    });
+    const waitMs = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+    let liftRaf = 0;
+    void Promise.race([
+      Promise.all([videoReady, document.fonts.ready, waitMs(MIN_VEIL_MS)]),
+      waitMs(MAX_VEIL_MS),
+    ]).then(() => {
+      // Two frames so the canvas has drawn before the veil fades.
+      liftRaf = requestAnimationFrame(() => {
+        liftRaf = requestAnimationFrame(() => {
+          if (active) setVeilLifted(true);
+        });
+      });
+    });
 
     const renderer = CharcoalRenderer.create(canvas, video, options);
     setGlOn(renderer !== null);
@@ -108,6 +130,7 @@ export function Experience({ children }: { children: ReactNode }) {
       active = false;
       cancelAnimationFrame(raf);
       cancelAnimationFrame(scrollRaf);
+      cancelAnimationFrame(liftRaf);
       window.clearTimeout(stall);
       video.pause();
       video.removeEventListener('loadeddata', onLoaded);
@@ -122,6 +145,9 @@ export function Experience({ children }: { children: ReactNode }) {
 
   return (
     <div className="stage" data-gl={glOn ? 'on' : 'off'}>
+      <div className="veil" data-lifted={veilLifted} aria-hidden="true">
+        <div className="veil-pulse" />
+      </div>
       <canvas ref={canvasRef} className="canvas" aria-hidden="true" />
       <video ref={videoRef} className="source" muted loop playsInline preload="auto" aria-hidden="true" />
       <main>{children}</main>
